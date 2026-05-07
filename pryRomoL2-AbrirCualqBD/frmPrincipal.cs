@@ -126,3 +126,6 @@ namespace pryRomoL2_AbrirCualqBD
         }
     }
 }
+
+
+//falta separar en clases 
