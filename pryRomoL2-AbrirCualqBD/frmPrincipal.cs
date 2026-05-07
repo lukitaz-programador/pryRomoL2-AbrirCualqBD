@@ -14,6 +14,7 @@ namespace pryRomoL2_AbrirCualqBD
     public partial class frmPrincipal : Form
     {
         private string cadenaConexion;
+        bool openCorrect = false;
 
         public frmPrincipal()
         {
@@ -33,6 +34,16 @@ namespace pryRomoL2_AbrirCualqBD
                 cadenaConexion = $"Provider=Microsoft.ACE.OLEDB.12.0;Data Source={rutaDB};Persist Security Info=False;";
 
                 CargarTablas();
+
+                openCorrect = true;
+                if (openCorrect == false)
+                {
+                    lblEstado.Text = "Sin conexión...";
+                }
+                else
+                {
+                    lblEstado.Text = "Conexión exitosa.";
+                }
             }
         }
 
@@ -67,6 +78,15 @@ namespace pryRomoL2_AbrirCualqBD
             catch (Exception ex)
             {
                 MessageBox.Show("Error al cargar tablas: " + ex.Message);
+                openCorrect = false;
+                if (openCorrect == false)
+                {
+                    lblEstado.Text = "Sin conexión...";
+                }
+                else
+                {
+                    lblEstado.Text = "Conexión exitosa.";
+                }
             }
         }
 
