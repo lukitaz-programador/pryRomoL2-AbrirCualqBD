@@ -1,131 +1,101 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Data;
-using System.Data.OleDb;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace pryRomoL2_AbrirCualqBD
 {
+    /// <summary>
+    /// Formulario principal. Solo se encarga de la interfaz de usuario;
+    /// delega toda la lógica a ConexionDB y TablaService.
+    /// </summary>
     public partial class frmPrincipal : Form
     {
-        private string cadenaConexion;
-        bool openCorrect = false;
+        private readonly ConexionDB _conexionDB;
+        private readonly TablaService _tablaService;
 
         public frmPrincipal()
         {
             InitializeComponent();
+
+            _conexionDB  = new ConexionDB();
+            _tablaService = new TablaService(_conexionDB);
         }
 
-        // BOTÓN: Abrir base de datos
+        // ── EVENTOS ──────────────────────────────────────────────────────────
+
         private void btnAbrirBD_Click(object sender, EventArgs e)
         {
-            OpenFileDialog ofd = new OpenFileDialog();
-            ofd.Filter = "Base de datos Access (*.accdb;*.mdb)|*.accdb;*.mdb";
-
-            if (ofd.ShowDialog() == DialogResult.OK)
+            using (OpenFileDialog ofd = new OpenFileDialog())
             {
-                string rutaDB = ofd.FileName;
+                ofd.Filter = "Base de datos Access (*.accdb;*.mdb)|*.accdb;*.mdb";
 
-                cadenaConexion = $"Provider=Microsoft.ACE.OLEDB.12.0;Data Source={rutaDB};Persist Security Info=False;";
+                if (ofd.ShowDialog() != DialogResult.OK)
+                    return;
 
-                CargarTablas();
-
-                openCorrect = true;
-                if (openCorrect == false)
-                {
-                    lblEstado.Text = "Sin conexión...";
-                }
-                else
-                {
-                    lblEstado.Text = "Conexión exitosa.";
-                }
+                AbrirBaseDeDatos(ofd.FileName);
             }
         }
 
-        // Cargar tablas en el ComboBox
-        private void CargarTablas()
-        {
-            try
-            {
-                using (OleDbConnection conexion = new OleDbConnection(cadenaConexion))
-                {
-                    conexion.Open();
-
-                    DataTable esquema = conexion.GetSchema("Tables");
-
-                    cmbTablas.Items.Clear();
-
-                    foreach (DataRow row in esquema.Rows)
-                    {
-                        string tipo = row["TABLE_TYPE"].ToString();
-
-                        // Solo tablas reales (no vistas del sistema)
-                        if (tipo == "TABLE")
-                        {
-                            cmbTablas.Items.Add(row["TABLE_NAME"].ToString());
-                        }
-                    }
-
-                    if (cmbTablas.Items.Count > 0)
-                        cmbTablas.SelectedIndex = 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error al cargar tablas: " + ex.Message);
-                openCorrect = false;
-                if (openCorrect == false)
-                {
-                    lblEstado.Text = "Sin conexión...";
-                }
-                else
-                {
-                    lblEstado.Text = "Conexión exitosa.";
-                }
-            }
-        }
-
-        // Cuando seleccionás una tabla → mostrar datos
         private void cmbTablas_SelectedIndexChanged(object sender, EventArgs e)
         {
             if (cmbTablas.SelectedItem != null)
-            {
-                string tabla = cmbTablas.SelectedItem.ToString();
-                MostrarDatos(tabla);
-            }
+                MostrarDatosDeTabla(cmbTablas.SelectedItem.ToString());
         }
 
-        // Mostrar datos en el DataGridView
-        private void MostrarDatos(string tabla)
+        // ── MÉTODOS DE UI ────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Conecta con la BD seleccionada y carga las tablas en el ComboBox.
+        /// </summary>
+        private void AbrirBaseDeDatos(string rutaArchivo)
         {
             try
             {
-                using (OleDbConnection conexion = new OleDbConnection(cadenaConexion))
-                {
-                    conexion.Open();
+                _conexionDB.Conectar(rutaArchivo);
 
-                    string query = $"SELECT * FROM [{tabla}]";
+                List<string> tablas = _tablaService.ObtenerNombresDeTablas();
 
-                    OleDbDataAdapter da = new OleDbDataAdapter(query, conexion);
-                    DataTable dt = new DataTable();
+                cmbTablas.Items.Clear();
+                cmbTablas.Items.AddRange(tablas.ToArray());
 
-                    da.Fill(dt);
+                if (cmbTablas.Items.Count > 0)
+                    cmbTablas.SelectedIndex = 0;
 
-                    dgvDatos.DataSource = dt;
-                }
+                ActualizarEstado(true);
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error al mostrar datos: " + ex.Message);
+                _conexionDB.Desconectar();
+                ActualizarEstado(false);
+                MessageBox.Show("Error al abrir la base de datos: " + ex.Message,
+                                "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        /// <summary>
+        /// Carga y muestra los datos de la tabla indicada en el DataGridView.
+        /// </summary>
+        private void MostrarDatosDeTabla(string nombreTabla)
+        {
+            try
+            {
+                DataTable datos = _tablaService.ObtenerDatosDeTabla(nombreTabla);
+                dgvDatos.DataSource = datos;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error al mostrar datos: " + ex.Message,
+                                "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Actualiza el label de estado según si la conexión fue exitosa o no.
+        /// </summary>
+        private void ActualizarEstado(bool conectado)
+        {
+            lblEstado.Text = conectado ? "Conexión exitosa." : "Sin conexión...";
         }
     }
 }
-
-
-//falta separar en clases 
